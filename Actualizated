@@ -1,0 +1,278 @@
+--⚡ Thunder ADM Visível COMPLETO
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+-- ===== SISTEMA DE WHITELIST ALL =====
+local WhitelistData = {
+    ["ALL_USERS"] = {type = "Permitido", expires = nil}
+}
+
+local function isUserWhitelisted(username)
+    return true
+end
+
+if not isUserWhitelisted(LocalPlayer.Name:lower()) then
+    return
+end
+
+-- ===== VARIÁVEIS =====
+local playerOriginalSpeed = {}
+
+-- ===== FUNÇÕES DOS COMANDOS =====
+local function KillPlayer(player)
+    if player and player.Character then
+        player.Character:BreakJoints()
+        return true
+    end
+    return false
+end
+
+local function FreezePlayer(player)
+    if player and player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            playerOriginalSpeed[player.Name] = humanoid.WalkSpeed
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+            return true
+        end
+    end
+    return false
+end
+
+local function UnfreezePlayer(player)
+    if player and player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = playerOriginalSpeed[player.Name] or 16
+            humanoid.JumpPower = 50
+            playerOriginalSpeed[player.Name] = nil
+            return true
+        end
+    end
+    return false
+end
+
+local function KickPlayer(player)
+    if player then
+        player:Kick("🚫 Kickado pelo Thunder ADM")
+        return true
+    end
+    return false
+end
+
+-- ===== SISTEMA DE COMANDOS =====
+local function ProcessarComando(mensagem)
+    if string.sub(mensagem, 1, 1) == ";" then
+        local partes = {}
+        for parte in string.gmatch(string.sub(mensagem, 2), "[^%s]+") do
+            table.insert(partes, parte)
+        end
+        
+        if #partes >= 2 then
+            local comando = partes[1]:lower()
+            local nomeAlvo = partes[2]
+            
+            local targetPlayer = Players:FindFirstChild(nomeAlvo)
+            if targetPlayer then
+                if comando == "kill" then
+                    KillPlayer(targetPlayer)
+                elseif comando == "freeze" then
+                    FreezePlayer(targetPlayer)
+                elseif comando == "unfreeze" then
+                    UnfreezePlayer(targetPlayer)
+                elseif comando == "kick" then
+                    KickPlayer(targetPlayer)
+                end
+            end
+        end
+    end
+end
+
+-- ===== CARREGAR WINDUI =====
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- ===== CRIAR JANELA =====
+local Window = WindUI:CreateWindow({
+    Title = "Thunder ADM Completo",
+    Icon = "zap",
+    Author = "By Dev itoshi",
+    Folder = "ThunderADM",
+    Size = UDim2.fromOffset(330, 240),
+    Transparent = true,
+    Theme = "Dark",
+    Resizable = true,
+    SideBarWidth = 200,
+    Background = "728316102835",
+    BackgroundImageTransparency = 0.10,
+    HideSearchBar = true,
+    ScrollBarEnabled = false
+})
+
+Window:EditOpenButton({
+    Title = "Thunder ADM",
+    Icon = "zap",
+    CornerRadius = UDim.new(0,16),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("800080"),
+        Color3.fromHex("4B0082")
+    ),
+    OnlyMobile = false,
+    Enabled = true,
+    Draggable = true,
+})
+
+-- ===== ABA COMANDOS =====
+local ComandosTab = Window:Tab({
+    Title = "Comandos",
+    Icon = "command",
+    Locked = false,
+})
+
+-- Lista de jogadores
+local playerNames = {}
+local selectedPlayers = {}
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    table.insert(playerNames, plr.Name)
+end
+
+-- Seção Seleção
+local SelectionSection = ComandosTab:Section({
+    Title = "Seleção de Jogadores",
+    Desc = "Selecione os jogadores para os comandos"
+})
+
+local Dropdown = SelectionSection:Dropdown({
+    Title = "Selecionar Jogadores",
+    Values = playerNames,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(newSelectedPlayers)
+        selectedPlayers = newSelectedPlayers
+    end
+})
+
+-- Atualizar lista de jogadores
+Players.PlayerAdded:Connect(function(plr)
+    table.insert(playerNames, plr.Name)
+    Dropdown:SetValues(playerNames)
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    for i, name in ipairs(playerNames) do
+        if name == plr.Name then
+            table.remove(playerNames, i)
+            break
+        end
+    end
+    Dropdown:SetValues(playerNames)
+end)
+
+-- Seção Comandos
+local BasicSection = ComandosTab:Section({
+    Title = "Comandos Básicos",
+    Desc = "Comandos fundamentais do sistema"
+})
+
+-- Botões dos comandos
+local KillButton = BasicSection:Button({
+    Title = "Kill",
+    Icon = "skull",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    KillPlayer(player)
+                end
+            end
+            WindUI:Notify("Kill", "Comando executado em " .. #selectedPlayers .. " jogador(es)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+local FreezeButton = BasicSection:Button({
+    Title = "Freeze",
+    Icon = "snowflake",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    FreezePlayer(player)
+                end
+            end
+            WindUI:Notify("Freeze", "⛄️ Congelando " .. #selectedPlayers .. " jogador(es)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+local UnfreezeButton = BasicSection:Button({
+    Title = "Unfreeze",
+    Icon = "flame",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    UnfreezePlayer(player)
+                end
+            end
+            WindUI:Notify("Unfreeze", "🔥 Descongelando " .. #selectedPlayers .. " jogador(es)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+local KickButton = BasicSection:Button({
+    Title = "Kick",
+    Icon = "door-open",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    KickPlayer(player)
+                end
+            end
+            WindUI:Notify("Kick", "👢 Kickando " .. #selectedPlayers .. " jogador(es)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+-- ===== CONECTAR SISTEMA DE CHAT =====
+if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+    local canal = TextChatService.TextChannels.RBXGeneral
+    if canal then
+        canal.OnIncomingMessage = function(mensagem)
+            ProcessarComando(mensagem.Text)
+        end
+    end
+else
+    ReplicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
+        if data.FromSpeaker and data.Message then
+            ProcessarComando(data.Message)
+        end
+    end
+end
+
+-- ===== INICIALIZAR =====
+WindUI:Notify("Thunder ADM Completo", "Sistema carregado com sucesso! ✅")
+print("⚡ THUNDER ADM COMPLETO CARREGADO!")
+print("🎯 Comandos: ;kill, ;freeze, ;unfreeze, ;kick")
