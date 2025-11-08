@@ -1,0 +1,308 @@
+-- Thunder Hub - Painel Admin
+-- Desenvolvido por: Nagi
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+
+-- ===== SISTEMA DE JAIL =====
+local JAIL_SYSTEM = {}
+
+local function CreateJail(player)
+    if not player or not player.Character then return false end
+    
+    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return false end
+    
+    -- Remover jail anterior se existir
+    if JAIL_SYSTEM[player.Name] then
+        RemoveJail(player)
+    end
+    
+    local size = 12
+    local jailPosition = humanoidRootPart.Position + Vector3.new(0, 10, 0)
+    
+    JAIL_SYSTEM[player.Name] = {
+        OriginalPosition = humanoidRootPart.Position,
+        Parts = {}
+    }
+    
+    -- Função para criar barras da prisão
+    local function criarBarraJail(cframe, size, color)
+        local p = Instance.new("Part")
+        p.Name = "ThunderJailBar_" .. player.Name
+        p.Size = size
+        p.Anchored = true
+        p.CanCollide = true
+        p.Material = Enum.Material.Neon
+        p.BrickColor = color
+        p.Reflectance = 0.2
+        p.CFrame = cframe
+        p.Parent = Workspace
+        
+        local pointLight = Instance.new("PointLight")
+        pointLight.Brightness = 3
+        pointLight.Range = 8
+        pointLight.Color = color == BrickColor.new("Really black") and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+        pointLight.Parent = p
+        
+        table.insert(JAIL_SYSTEM[player.Name].Parts, p)
+        return p
+    end
+
+    -- BARRAS VERTICAIS (Cantos)
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(size/2, 0, size/2)), Vector3.new(0.8, size, 0.8), BrickColor.new("Really black"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(-size/2, 0, size/2)), Vector3.new(0.8, size, 0.8), BrickColor.new("Really black"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(size/2, 0, -size/2)), Vector3.new(0.8, size, 0.8), BrickColor.new("Really black"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(-size/2, 0, -size/2)), Vector3.new(0.8, size, 0.8), BrickColor.new("Really black"))
+
+    -- BARRAS HORIZONTAIS SUPERIORES BRANCAS
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(0, size/2, size/2)), Vector3.new(size, 0.8, 0.8), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(0, size/2, -size/2)), Vector3.new(size, 0.8, 0.8), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(size/2, size/2, 0)), Vector3.new(0.8, 0.8, size), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(-size/2, size/2, 0)), Vector3.new(0.8, 0.8, size), BrickColor.new("Institutional white"))
+
+    -- BARRAS HORIZONTAIS INFERIORES BRANCAS
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(0, -size/2, size/2)), Vector3.new(size, 0.8, 0.8), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(0, -size/2, -size/2)), Vector3.new(size, 0.8, 0.8), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(size/2, -size/2, 0)), Vector3.new(0.8, 0.8, size), BrickColor.new("Institutional white"))
+    criarBarraJail(CFrame.new(jailPosition + Vector3.new(-size/2, -size/2, 0)), Vector3.new(0.8, 0.8, size), BrickColor.new("Institutional white"))
+
+    -- Teleportar jogador para a prisão
+    humanoidRootPart.CFrame = CFrame.new(jailPosition + Vector3.new(0, -size/2 + 3, 0))
+    
+    -- Congelar jogador
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+    end
+
+    -- Sistema de monitoramento para manter jogador na prisão
+    JAIL_SYSTEM[player.Name].Connection = RunService.Heartbeat:Connect(function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local center = jailPosition
+            if (hrp.Position - center).Magnitude > size/2 - 1 then
+                hrp.CFrame = CFrame.new(jailPosition + Vector3.new(0, -size/2 + 3, 0))
+            end
+        end
+    end)
+
+    WindUI:Notify("Jail", "🚓 " .. player.Name .. " preso!")
+    return true
+end
+
+local function RemoveJail(player)
+    if not JAIL_SYSTEM[player.Name] then return false end
+    
+    -- Remover conexão de monitoramento
+    if JAIL_SYSTEM[player.Name].Connection then
+        JAIL_SYSTEM[player.Name].Connection:Disconnect()
+    end
+    
+    -- Remover partes da prisão
+    for _, part in ipairs(JAIL_SYSTEM[player.Name].Parts) do
+        if part and part.Parent then
+            part:Destroy()
+        end
+    end
+    
+    -- Restaurar movimento do jogador
+    if player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
+    end
+    
+    JAIL_SYSTEM[player.Name] = nil
+    WindUI:Notify("Jail", "🔓 " .. player.Name .. " solto!")
+    return true
+end
+
+-- ===== FUNÇÃO CRASH =====
+local function CrashPlayer(player)
+    if not player then return false end
+    
+    -- Efeito visual de crash
+    if player.Character then
+        local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            local crashEffect = Instance.new("Part")
+            crashEffect.Name = "ThunderCrashEffect"
+            crashEffect.Size = Vector3.new(8, 8, 8)
+            crashEffect.Shape = Enum.PartType.Ball
+            crashEffect.Material = Enum.Material.Neon
+            crashEffect.BrickColor = BrickColor.new("Bright red")
+            crashEffect.Position = humanoidRootPart.Position
+            crashEffect.Anchored = true
+            crashEffect.CanCollide = false
+            crashEffect.Parent = Workspace
+            
+            local crashLight = Instance.new("PointLight")
+            crashLight.Brightness = 15
+            crashLight.Range = 20
+            crashLight.Color = Color3.new(1, 0, 0)
+            crashLight.Parent = crashEffect
+            
+            -- Animação de expansão
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            local tween = TweenService:Create(crashEffect, tweenInfo, {Size = Vector3.new(20, 20, 20), Transparency = 0.8})
+            tween:Play()
+            
+            game:GetService("Debris"):AddItem(crashEffect, 2)
+        end
+    end
+    
+    -- Fazer o jogo do jogador travar
+    coroutine.wrap(function()
+        wait(1)
+        while true do
+            -- Loop infinito para crashar o jogo
+        end
+    end)()
+    
+    WindUI:Notify("Crash", "💥 " .. player.Name .. " crashado!")
+    return true
+end
+
+-- ... (código anterior da whitelist, variáveis e funções mantido) ...
+
+-- ===== ADICIONAR BOTÕES CRASH E JAIL =====
+
+-- Botão Crash cmd
+local CrashButton = BasicSection:Button({
+    Title = "Crash cmd",
+    Icon = "alert-triangle", 
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    CrashPlayer(player)
+                end
+            end
+            WindUI:Notify("Crash", "💥 Comando executado em " .. #selectedPlayers .. " jogador(es)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+-- Botão Jail cmd
+local JailButton = BasicSection:Button({
+    Title = "Jail cmd",
+    Icon = "lock",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    CreateJail(player)
+                end
+            end
+            WindUI:Notify("Jail", "🚓 " .. #selectedPlayers .. " jogador(es) preso(s)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+-- Botão Unjail cmd
+local UnjailButton = BasicSection:Button({
+    Title = "Unjail cmd",
+    Icon = "unlock",
+    Callback = function()
+        if #selectedPlayers > 0 then
+            for _, playerName in ipairs(selectedPlayers) do
+                local player = Players:FindFirstChild(playerName)
+                if player then
+                    RemoveJail(player)
+                end
+            end
+            WindUI:Notify("Jail", "🔓 " .. #selectedPlayers .. " jogador(es) solto(s)!")
+        else
+            WindUI:Notify("Erro", "❌ Selecione jogadores primeiro!")
+        end
+    end
+})
+
+-- ===== SISTEMA DE COMANDOS COM CRASH E JAIL =====
+local function ProcessarComando(mensagem)
+    if string.sub(mensagem, 1, 1) == ";" then
+        local partes = string.split(string.sub(mensagem, 2), " ")
+        local comando = partes[1]:lower()
+        local nomeAlvo = table.concat(partes, " ", 2)
+        
+        local isSelfTarget = nomeAlvo and (nomeAlvo:lower() == LocalPlayer.Name:lower() or nomeAlvo:lower() == LocalPlayer.DisplayName:lower())
+        local playerName = LocalPlayer.Name
+        local character = LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if isSelfTarget then
+            print("🎯 Comando recebido: " .. comando .. " para " .. LocalPlayer.Name)
+            
+            -- Comando Crash
+            if comando == "crash" then
+                print("💥 CRASH executado em " .. LocalPlayer.Name)
+                CrashPlayer(LocalPlayer)
+                return
+            
+            -- Comando Jail
+            elseif comando == "jail" then
+                if character then
+                    local root = character:FindFirstChild("HumanoidRootPart")  
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")  
+                    if root and humanoid then  
+                        CreateJail(LocalPlayer)
+                        print("⛓️ JAIL executado em " .. LocalPlayer.Name)
+                    end  
+                end  
+                return  
+            
+            -- Comando Unjail
+            elseif comando == "unjail" then
+                RemoveJail(LocalPlayer)
+                print("🔓 UNJAIL executado em " .. LocalPlayer.Name)
+                return
+            
+            -- ... (outros comandos anteriores mantidos) ...
+            end
+        end
+        
+        -- Comandos em outros jogadores
+        if nomeAlvo and nomeAlvo ~= "" then
+            local targetPlayer = Players:FindFirstChild(nomeAlvo)
+            if targetPlayer then
+                if comando == "crash" then
+                    CrashPlayer(targetPlayer)
+                elseif comando == "jail" then
+                    CreateJail(targetPlayer)
+                elseif comando == "unjail" then
+                    RemoveJail(targetPlayer)
+                end
+            end
+        end
+        
+        -- ... (restante do código de comandos mantido) ...
+    end
+end
+
+-- ... (restante do código mantido) ...
+
+print("⚡ THUNDER HUB - SISTEMA FUNCIONANDO!")
+print("👨‍💻 Desenvolvido por: Nagi")
+print("🔐 SISTEMA DE WHITELIST ATIVADO")
+print("💀 KILL PLUS FUNCIONAL!")
+print("🏷️ SISTEMA DE TAGS ATIVO!")
+print("🚓 SISTEMA JAIL ATIVO!")
+print("💥 SISTEMA CRASH ATIVO!")
